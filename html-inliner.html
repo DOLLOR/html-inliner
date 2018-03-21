@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <div>outer href, src to dataurl</div>
+    <div>
+        <script>
+            !(function(){
+                /**@type {HTMLDivElement}**/
+                let myDiv = document.body.lastElementChild;
+
+                /**
+                 * get string
+                 * @param url {String}
+                 * @return {String}
+                 **/
+                let getFileString = function(url){
+                    let xhr = new XMLHttpRequest();
+                    xhr.open('GET',url,true);
+                    xhr.responseType = 'text';
+                    return new Promise(resolve => {
+                        xhr.send(null);
+                        xhr.onload = function(ev){
+                            resolve(ev.target.responseText);
+                        };
+                    });
+                };
+
+                /**
+                 * download file as base64 string
+                 * @param url {String}
+                 * @param callback {(base64:String)=>void}
+                 **/
+                function fileToDataUrl(url, callback) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.responseType = 'blob';
+                    xhr.withCredentials = true;
+                    xhr.onload = function () {
+                        var reader = new FileReader();
+                        reader.onloadend = function () {
+                            callback(reader.result);
+                        };
+                        reader.readAsDataURL(xhr.response);
+                    };
+                    xhr.open('GET', url);
+                    xhr.send();
+                }
+
+                /**
+                 * download file as base64 string
+                 * @param url {String}
+                 * @return {Promise<String>}
+                 **/
+                let loadFile = function (url) {
+                    return new Promise(function (resolve) {
+                        fileToDataUrl(url,resolve);
+                    });
+                };
+
+                {
+                    // create url string input box
+                    let urlTextbox = document.createElement('input');
+                    myDiv.appendChild(urlTextbox);
+
+                    // create button
+                    let buttonEl = document.createElement('button');
+                    buttonEl.innerHTML = 'get';
+                    buttonEl.onclick = async function(){
+                        // get html string
+                        let text = await getFileString(urlTextbox.value);
+                        // parse html
+                        let parser = new DOMParser();
+                        let doc = parser.parseFromString(text, "text/html");
+                        // replace src or href attr with dataurl
+                        let outerRefList = doc.querySelectorAll('[src],[href]');
+                        for(let i=0;i<outerRefList.length;i++){
+                            let el = outerRefList[i];
+                            let attr = el.src ? 'src' : 'href';
+                            /** @type {String} **/
+                            let fileDataUrl = await loadFile(el[attr]);
+                            el.setAttribute(attr,fileDataUrl.replace('base64,','charset=UTF-8;base64,'));
+                        }
+                        // set download button
+                        downlink.download = (urlTextbox.value.match(/[^\/]+\.html/)||['output.html'])[0].replace('.html','.bundle-datauri.html');
+                        downlink.href = `data:text/html;charset=UTF-8,`+
+                            encodeURIComponent('<!DOCTYPE html>\n')+
+                            encodeURIComponent(doc.documentElement.outerHTML);
+                        alert('ok');
+                    };
+                    myDiv.appendChild(buttonEl);
+
+                    // download button
+                    let downlink = document.createElement('a');
+                    downlink.innerHTML = 'download';
+                    downlink.href = 'javascript:void(0)';
+                    myDiv.appendChild(downlink);
+                }
+            })();
+        </script>
+    </div>
+    <!-- -------------------------------------------------------------------------------------------- -->
+    <hr>
+    <div>outer script, style to inner</div>
+    <div>
+        <script>
+            !(function(){
+                let myDiv = document.body.lastElementChild;
+
+                /**
+                 * get string
+                 * @param url {String}
+                 * @return {String}
+                 **/
+                let getFileString = function(url){
+                    let xhr = new XMLHttpRequest();
+                    xhr.open('GET',url,true);
+                    xhr.responseType = 'text';
+                    return new Promise(resolve => {
+                        xhr.send(null);
+                        xhr.onload = function(ev){
+                            resolve(ev.target.responseText);
+                        };
+                    });
+                };
+
+                {
+                    // create url string input box
+                    let urlTextbox = document.createElement('input');
+                    myDiv.appendChild(urlTextbox);
+
+                    // create button
+                    let buttonEl = document.createElement('button');
+                    buttonEl.innerHTML = 'get';
+                    buttonEl.onclick = async function(){
+                        // get html string
+                        let text = await getFileString(urlTextbox.value);
+                        // parse html
+                        let parser = new DOMParser();
+                        let doc = parser.parseFromString(text, "text/html");
+                        {
+                            // replace outer script with inner script
+                            let outerRefList = doc.querySelectorAll('script[src]');
+                            for(let i=0;i<outerRefList.length;i++){
+                                let el = outerRefList[i];
+                                let scriptContent = await getFileString(el.src);
+                                el.innerHTML = scriptContent + `\n//# sourceURL=${el.src}\n`;
+                                el.removeAttribute('src');
+                            }
+                        }
+                        {
+                            // replace link css with inner style
+                            let outerRefList = doc.querySelectorAll('[rel="stylesheet"][href]');
+                            for(let i=0;i<outerRefList.length;i++){
+                                let el = outerRefList[i];
+                                let scriptContent = await getFileString(el.href);
+                                el.insertAdjacentHTML('afterend',`<style>${scriptContent}\n/*# sourceURL=${el.href} */\n</style>`)
+                                el.parentElement.removeChild(el);
+                            }
+                        }
+                        // set download button
+                        downlink.download = (urlTextbox.value.match(/[^\/]+\.html/)||['output.html'])[0].replace('.html','.bundle-inline.html');
+                        downlink.href = `data:text/html;charset=UTF-8,`+
+                            encodeURIComponent('<!DOCTYPE html>\n')+
+                            encodeURIComponent(doc.documentElement.outerHTML);
+                        alert('ok');
+                    };
+                    myDiv.appendChild(buttonEl);
+
+                    // download button
+                    let downlink = document.createElement('a');
+                    downlink.innerHTML = 'download';
+                    downlink.href = 'javascript:void(0)';
+                    myDiv.appendChild(downlink);
+                }
+            })();
+        </script>
+    </div>
+</body>
+</html>
